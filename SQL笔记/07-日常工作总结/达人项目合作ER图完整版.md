@@ -12,6 +12,7 @@ tags:
 
 > 根据实际业务 SQL 梳理的表关系
 > 包含：达人合作 + 爆款视频评分脚本
+> 连线标注格式：`左表.字段 = 右表.字段`
 
 ---
 
@@ -23,29 +24,27 @@ tags:
 | 2 | 业务层 | sales_influencer_coop_project_influencer | cpi | 项目-达人关联表 |
 | 3 | 业务层 | sales_influencer_coop_project_influencer_video | cpiv | 达人视频表 |
 | 4 | 业务层 | sales_influencer | si | 达人表 |
-| 5 | ODS | **ods_xd_manage_data_syj_talent_video** | **t1** | **生意经视频数据主表** |
-| 6 | ODS | **ods_sales_sales_influencer_coop_project_influencer_video** | **t2** | **项目-达人-视频关联表（ODS层）** |
-| 7 | ODS | **ods_sales_sales_ad_product_library** | **t3** | **广告产品库表** |
-| 8 | ADS | **ads_sales_talent_video_hot_script** | **目标表** | **爆款视频热度评分结果表** |
-
-> 注：业务层 `sales_influencer_coop_project_influencer_video` 与 ODS 层 `ods_sales_sales_influencer_coop_project_influencer_video` 是同一业务的不同分层
+| 5 | ODS | ods_xd_manage_data_syj_talent_video | t1 | 生意经视频数据主表 |
+| 6 | ODS | ods_sales_sales_influencer_coop_project_influencer_video | t2 | 项目-达人-视频关联表（ODS层） |
+| 7 | ODS | ods_sales_sales_ad_product_library | t3 | 广告产品库表 |
+| 8 | ADS | ads_sales_talent_video_hot_script | - | 爆款视频热度评分结果表 |
 
 ---
 
-## 二、表间关系
+## 二、表间关系 ER 图
 
 ```mermaid
 erDiagram
-    %% ========== 业务层关系 ==========
-    sales_influencer_coop_project ||--o{ sales_influencer_coop_project_influencer : "1个项目有N个达人"
-    sales_influencer_coop_project_influencer ||--o{ sales_influencer_coop_project_influencer_video : "1个关联有N个视频"
-    sales_influencer_coop_project_influencer }o--|| sales_influencer : "N个达人关联1个达人信息"
+    %% ========== 业务层 ==========
+    sales_influencer_coop_project ||--o{ sales_influencer_coop_project_influencer : "cp.id = cpi.project_id"
+    sales_influencer_coop_project_influencer ||--o{ sales_influencer_coop_project_influencer_video : "cpi.id = cpiv.project_influencer_relation_id"
+    sales_influencer_coop_project_influencer }o--|| sales_influencer : "cpi.influencer_id = si.id"
 
-    %% ========== ODS 层关系 ==========
-    ods_xd_manage_data_syj_talent_video ||--o{ ods_sales_sales_influencer_coop_project_influencer_video : "item_id = douyin_video_id"
-    ods_sales_sales_influencer_coop_project_influencer_video }o--|| ods_sales_sales_ad_product_library : "ad_product_library_id = id"
+    %% ========== ODS 层 ==========
+    ods_xd_manage_data_syj_talent_video ||--o{ ods_sales_sales_influencer_coop_project_influencer_video : "t1.item_id = t2.douyin_video_id"
+    ods_sales_sales_influencer_coop_project_influencer_video }o--|| ods_sales_sales_ad_product_library : "t2.ad_product_library_id = t3.id"
 
-    %% ========== 业务层表定义 ==========
+    %% ========== 表定义 ==========
     sales_influencer_coop_project {
         int id PK
         varchar project_name
@@ -79,8 +78,6 @@ erDiagram
         datetime update_time
         int del_flag
     }
-
-    %% ========== ODS 层表定义 ==========
     ods_xd_manage_data_syj_talent_video {
         int id PK
         varchar item_id
@@ -123,62 +120,71 @@ erDiagram
 
 ---
 
-## 三、SQL 关联详解
+## 三、关联关系速查表
 
-### 3.1 核心数据流
+| 左表 | 关联键 | 右表 | JOIN 类型 |
+|------|--------|------|-----------|
+| cp (项目表) | **cp.id = cpi.project_id** | cpi (项目-达人关联表) | 1:N |
+| cpi (项目-达人关联表) | **cpi.id = cpiv.project_influencer_relation_id** | cpiv (达人视频表) | 1:N |
+| cpi (项目-达人关联表) | **cpi.influencer_id = si.id** | si (达人表) | N:1 |
+| t1 (生意经视频) | **t1.item_id = t2.douyin_video_id** | t2 (项目达人视频关联表) | LEFT JOIN |
+| t2 (项目达人视频关联表) | **t2.ad_product_library_id = t3.id** | t3 (广告产品库) | LEFT JOIN |
 
-```mermaid
-graph LR
-    subgraph ODS层
-        A[ods_xd_manage_data<br/>_syj_talent_video]
-        B[ods_sales_sales_influencer<br/>_coop_project_influencer_video]
-        C[ods_sales_sales<br/>_ad_product_library]
-    end
-    
-    subgraph ADS层
-        D[ads_sales_talent_video_hot_script<br/>INSERT OVERWRITE]
-    end
-    
-    A -- "LEFT JOIN<br/>item_id = douyin_video_id" --> B
-    B -- "LEFT JOIN<br/>ad_product_library_id = id" --> C
-    A -.->|数据来源| D
-    C -.->|数据来源| D
-```
+---
 
-### 3.2 第1层关联
+## 四、SQL 关联详解
+
+### 4.1 第1层关联
 ```sql
 FROM taidou_local_life.ods_xd_manage_data_syj_talent_video t1
-LEFT JOIN (
-    SELECT douyin_video_id,
-           max(ad_product_library_id) as ad_product_library_id,
-           max(project_id) as project_id
-    FROM taidou_local_life.ods_sales_sales_influencer_coop_project_influencer_video
-    WHERE ds >= '20260609' AND del_flag = '0'
-    GROUP BY douyin_video_id
-) t2 ON t1.item_id = t2.douyin_video_id
+LEFT JOIN ( ... GROUP BY douyin_video_id ) t2
+ON t1.item_id = t2.douyin_video_id
 ```
-> **t1.item_id = t2.douyin_video_id** — 生意经视频通过 item_id 关联到项目达人视频
+> **t1.item_id = t2.douyin_video_id**
+> t1 为主表，t2 先按 douyin_video_id 去重再 LEFT JOIN
 
-### 3.3 第2层关联
+### 4.2 第2层关联
 ```sql
 LEFT JOIN taidou_local_life.ods_sales_sales_ad_product_library t3
 ON t2.ad_product_library_id = t3.id
-AND t3.ai_script_content IS NOT NULL
-AND Trim(t3.ai_script_content) <> ''
-AND t3.ds >= '20260609'
 ```
-> **t2.ad_product_library_id = t3.id** — 项目达人视频通过广告产品库ID关联广告产品信息
+> **t2.ad_product_library_id = t3.id**
+> 通过广告产品库ID获取AI脚本内容，用于打标签
 
-### 3.4 最终写入
+### 4.3 最终写入
 ```sql
 INSERT OVERWRITE TABLE ads_sales_talent_video_hot_script PARTITION (ds='20260624')
 SELECT ... FROM (...) t WHERE t.is_hot_video = '爆款'
 ```
-> 结果写入 ADS 层，只保留爆款视频
 
 ---
 
-## 四、爆款分层与评分
+## 五、数据血缘
+
+```mermaid
+graph LR
+    subgraph ODS层
+        A["ods_xd_manage_data<br/>_syj_talent_video (t1)"]
+        B["ods_sales_sales_influencer<br/>_coop_project_influencer<br/>_video (t2)"]
+        C["ods_sales_sales<br/>_ad_product_library (t3)"]
+    end
+    
+    subgraph 计算
+        D["爆款判定<br/>+ 热度评分<br/>+ 标签打标"]
+    end
+    
+    subgraph ADS层
+        E["ads_sales_talent_video_hot_script"]
+    end
+    
+    A -- "t1.item_id = t2.douyin_video_id" --> D
+    B -- "t2.ad_product_library_id = t3.id" --> D
+    D --> "INSERT OVERWRITE" --> E
+```
+
+---
+
+## 六、爆款分层与评分
 
 | 等级 | 播放量 | 完播率 | 5秒播放率 | 互动数 | GMV | 评分公式 |
 |------|--------|--------|-----------|--------|-----|---------|
@@ -189,7 +195,7 @@ SELECT ... FROM (...) t WHERE t.is_hot_video = '爆款'
 
 ---
 
-## 五、标签体系
+## 七、标签体系
 
 | 类别 | 标签 | 字段 | 关键词 |
 |------|------|------|--------|
@@ -205,32 +211,6 @@ SELECT ... FROM (...) t WHERE t.is_hot_video = '爆款'
 | | 保险 | tag_policy_insurance | 保险、车险、保险礼包 |
 | | 充电 | tag_policy_charging | 充电桩、充电枪 |
 | | 其他权益 | tag_policy_other | 以上均未命中 |
-
----
-
-## 六、数据血缘
-
-```mermaid
-graph TD
-    subgraph ODS源表
-        A["ods_xd_manage_data_syj_talent_video<br/>(生意经视频)"]
-        B["ods_sales_sales_influencer_coop<br/>_project_influencer_video<br/>(项目达人视频关联)"]
-        C["ods_sales_sales_ad_product_library<br/>(广告产品库)"]
-    end
-    
-    subgraph 计算过程
-        D["LEFT JOIN → 爆款判定<br/>→ 热度评分 → 标签打标"]
-    end
-    
-    subgraph ADS结果
-        E["ads_sales_talent_video_hot_script<br/>(爆款视频热度评分)"]
-    end
-    
-    A -->|item_id| D
-    B -->|douyin_video_id| D
-    C -->|ad_product_library_id| D
-    D -->|INSERT OVERWRITE| E
-```
 
 ---
 
