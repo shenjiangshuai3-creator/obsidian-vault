@@ -1,0 +1,5 @@
+﻿# Obsidian 配置文件（不同步）
+.obsidian/
+*.tmp
+.DS_Store
+Thumbs.db
