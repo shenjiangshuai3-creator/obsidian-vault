@@ -4,6 +4,16 @@
 
 ---
 
+## 个性化修改记录
+
+> 在此记录你对原版 SQL 的修改，方便后续追溯。
+>
+> | 日期 | 修改位置 | 修改内容 |
+> |------|---------|--------|
+> | 2026-07-02 | 2.1 重复检查 | 改为 ds >= 范围 + ORDER BY |
+
+---
+
 ## 1. 表基本信息
 
 ```sql
@@ -22,12 +32,26 @@ WHERE ds = '20260624';
 
 ```sql
 -- 2.1 检查 douyin_video_id 是否有重复（理论上它是主键）
+-- 【原版】只查单日
 SELECT douyin_video_id, COUNT(1) AS cnt
 FROM taidou_local_life.ods_sales_sales_influencer_coop_project_influencer_video
 WHERE ds = '20260624'
 GROUP BY douyin_video_id
 HAVING COUNT(1) > 1;
+```
 
+> 💡 **我的个性化版本（2026-07-02）：** 扩大时间范围 + 排序，看哪些视频重复最多
+>
+> ```sql
+> SELECT douyin_video_id, COUNT(1) AS cnt
+> FROM taidou_local_life.ods_sales_sales_influencer_coop_project_influencer_video
+> WHERE ds >= '20260501'
+> GROUP BY douyin_video_id
+> HAVING COUNT(1) > 1
+> ORDER BY cnt DESC;
+> ```
+
+```sql
 -- 2.2 查看重复的具体数据（如果有重复的话）
 SELECT *
 FROM (
@@ -178,3 +202,11 @@ UNION ALL
 SELECT '无项目ID数', COUNT(1) FROM taidou_local_life.ods_sales_sales_influencer_coop_project_influencer_video
 WHERE ds = '20260624' AND project_id IS NULL;
 ```
+
+---
+
+## 如何添加你的个性化修改
+
+1. 直接在这个文件中编辑，在每条 SQL 后面添加 `> 💡 我的个性化版本` 区域
+2. 或者在 `个性化修改记录` 表格中登记你的改动
+3. 如果 AI 后续更新此文件，会保留 `个性化修改记录` 表格中的内容
