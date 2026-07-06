@@ -41,7 +41,7 @@ erDiagram
     sales_influencer_coop_project_influencer }o--|| sales_influencer : "cpi.influencer_id = si.id"
 
     %% ========== ODS 层 ==========
-    ods_xd_manage_data_syj_talent_video ||--o{ ods_sales_sales_influencer_coop_project_influencer_video : "t1.item_id = t2.douyin_video_id"
+    ods_xd_manage_data_syj_talent_video ||--o{ ods_sales_sales_influencer_coop_project_influencer_video : "XXXXX"
     ods_sales_sales_influencer_coop_project_influencer_video }o--|| ods_sales_sales_ad_product_library : "t2.ad_product_library_id = t3.id"
 
     %% ========== 表定义 ==========
@@ -127,7 +127,7 @@ erDiagram
 | cp (项目表) | **cp.id = cpi.project_id** | cpi (项目-达人关联表) | 1:N |
 | cpi (项目-达人关联表) | **cpi.id = cpiv.project_influencer_relation_id** | cpiv (达人视频表) | 1:N |
 | cpi (项目-达人关联表) | **cpi.influencer_id = si.id** | si (达人表) | N:1 |
-| t1 (生意经视频) | **t1.item_id = t2.douyin_video_id** | t2 (项目达人视频关联表) | LEFT JOIN |
+| t1 (生意经视频) | **XXXXX** | t2 (项目达人视频关联表) | LEFT JOIN |
 | t2 (项目达人视频关联表) | **t2.ad_product_library_id = t3.id** | t3 (广告产品库) | LEFT JOIN |
 
 ---
@@ -138,9 +138,9 @@ erDiagram
 ```sql
 FROM taidou_local_life.ods_xd_manage_data_syj_talent_video t1
 LEFT JOIN ( ... GROUP BY douyin_video_id ) t2
-ON t1.item_id = t2.douyin_video_id
+ON XXXXX
 ```
-> **t1.item_id = t2.douyin_video_id**
+> **XXXXX**
 > t1 为主表，t2 先按 douyin_video_id 去重再 LEFT JOIN
 
 ### 4.2 第2层关联
@@ -163,23 +163,29 @@ SELECT ... FROM (...) t WHERE t.is_hot_video = '爆款'
 
 ```mermaid
 graph LR
-    subgraph ODS层
-        A["ods_xd_manage_data<br/>_syj_talent_video (t1)"]
-        B["ods_sales_sales_influencer<br/>_coop_project_influencer<br/>_video (t2)"]
-        C["ods_sales_sales<br/>_ad_product_library (t3)"]
+    subgraph ODS源表
+        A["ods_xd_manage_data_syj_talent_video (t1)"]
+        B["ods_sales_sales_influencer_coop_project_influencer_video (t2)"]
+        C["ods_sales_sales_ad_product_library (t3)"]
     end
     
-    subgraph 计算
-        D["爆款判定<br/>+ 热度评分<br/>+ 标签打标"]
+    subgraph SQL执行过程
+        D["FROM t1 (主表) LEFT JOIN t2 ON t1.item_id = t2.douyin_video_id LEFT JOIN t3 ON t2.ad_product_library_id = t3.id"]
     end
     
-    subgraph ADS层
-        E["ads_sales_talent_video_hot_script"]
+    subgraph 计算打标
+        E["爆款判定 + 热度评分 + 标签打标"]
     end
     
-    A -- "t1.item_id = t2.douyin_video_id" --> D
-    B -- "t2.ad_product_library_id = t3.id" --> D
-    D --> "INSERT OVERWRITE" --> E
+    subgraph ADS结果
+        F["ads_sales_talent_video_hot_script INSERT OVERWRITE"]
+    end
+    
+    A -->|主表| D
+    B -->|LEFT JOIN| D
+    C -->|LEFT JOIN| D
+    D -->|中间结果| E
+    E -->|最终写入| F
 ```
 
 ---
