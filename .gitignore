@@ -3,3 +3,11 @@
 *.tmp
 .DS_Store
 Thumbs.db
+
+# Agent 同步排除
+agent/.env
+agent/.agents/
+agent/__pycache__/
+agent/**/__pycache__/
+agent/=
+agent/*.pyc
