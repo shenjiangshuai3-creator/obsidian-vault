@@ -1,0 +1,7 @@
+﻿product_id,product_name,category,price,status
+prod_001,美妆示例商品1,美妆,64.15,on_sale
+prod_002,穿搭示例商品2,穿搭,69.93,on_sale
+prod_003,家居示例商品3,家居,294.39,on_sale
+prod_004,母婴示例商品4,母婴,354.84,on_sale
+prod_005,美食示例商品5,美食,106.27,on_sale
+prod_006,学习示例商品6,学习,57.95,on_sale
